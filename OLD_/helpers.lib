@@ -1,0 +1,183 @@
+<?php
+/*$inn = '0000411890';
+$kpp = '000000000';
+$res = validate_company($inn,$kpp);
+print_r($res);*/
+
+function real_number_length($num_string){
+        if (!$num_string) return 0;
+        
+        $length = strlen($num_string);
+        
+        $i = 0;
+        $sym = $num_string[$i];
+        while ($i < $length && $sym == '0'){
+                ++$i;
+                $sym = $num_string[$i];
+        }
+        return $length - $i;
+}
+
+function real_number($num_string){
+        if (!$num_string) return '';
+        
+        $sym = $num_string[0];
+        while ($sym == '0'){
+                $num_string = substr($num_string, 1);
+                $sym = $num_string[0];
+        }
+        return $num_string;
+}
+
+
+
+function check_company($companyInn, $companyKpp){
+        $company_inn_valid = is_numeric($companyInn);
+        $company_kpp_valid = $companyKpp ? is_numeric($companyKpp) :
+true;
+        $out = array();
+
+        $companyInnLength =
+strlen($companyInn);//real_number_length($companyInn);//strlen($companyInn);
+        $companyKppLength = strlen($companyKpp);
+        
+        if ($companyInnLength == 12 || $companyInnLength == 9 ||
+$companyInnLength == 8){
+            //$regexp_inn =
+'/^([0-9]{1}[1-9]{1}|[1-9]{1}[0-9]{1})[0-9]{10}$/';
+            //if (!preg_match($regexp_inn, $companyInn)){
+                //$company_inn_valid = false;
+            //}
+            //else{
+                if ($companyKppLength){
+                    $company_kpp_valid = false;
+                }
+            //}
+        }       
+        else if ($companyInnLength == 10) {     
+                if ( $companyKppLength != 9){
+                    $company_kpp_valid = false;
+                }
+                elseif($companyKppLength == 9){ 
+                        $regexp_kpp =
+'/^([0-9]{1}[1-9]{1}|[1-9]{1}[0-9]{1})[0-9]{7}|[0]{9}$/';
+                        if (!preg_match($regexp_kpp, $companyKpp)){
+                                $company_kpp_valid = false;
+                        }
+               }
+        }
+		else if ($companyInnLength == 6) {
+			if ( $companyKppLength ){
+				$company_kpp_valid = false;
+			}
+		}
+        else{
+                $company_inn_valid = false;
+        }
+        
+        $out['company_inn_valid'] = $company_inn_valid;
+        $out['company_kpp_valid'] = $company_kpp_valid;
+
+        return $out;
+}
+
+
+function validate_company(&$inn, &$kpp){
+        if (!$kpp || $kpp == '0' || strtolower($kpp) == 'null'){
+                $res = check_company($inn, '');
+                        if ($res['company_inn_valid'] &&
+$res['company_kpp_valid']){
+                                $kpp = '';
+                                return true;
+                        }
+                $trial_inn = '0' . $inn;
+                $res = check_company($trial_inn, '');
+                        if ($res['company_inn_valid'] &&
+$res['company_kpp_valid']){
+                                $inn = $trial_inn;
+                                $kpp = '';
+                                return true;
+                        }
+        }
+        else{
+                $res = check_company($inn, $kpp);
+                if ($res['company_inn_valid'] &&
+$res['company_kpp_valid']){
+                        return true;
+                }
+                
+                $trial_inn = '0' . $inn;
+                $trial_kpp = $kpp;
+                $res = check_company($trial_inn, $trial_kpp);
+                if ($res['company_inn_valid'] &&
+$res['company_kpp_valid']){
+                        $inn = $trial_inn;
+                        $kpp = $trial_kpp;
+                        return true;
+                }
+                
+                $trial_inn = $inn;
+                $trial_kpp = '0' . $kpp;
+                $res = check_company($trial_inn, $trial_kpp);
+                if ($res['company_inn_valid'] &&
+$res['company_kpp_valid']){
+                        $inn = $trial_inn;
+                        $kpp = $trial_kpp;
+                        return true;
+                }
+                
+                $trial_inn = '0' . $inn;
+                $trial_kpp = '0' . $kpp;
+                $res = check_company($trial_inn, $trial_kpp);
+                if ($res['company_inn_valid'] &&
+$res['company_kpp_valid']){
+                        $inn = $trial_inn;
+                        $kpp = $trial_kpp;
+                        return true;
+                }
+        }
+        
+        return false;
+        
+        
+        // old version - with adding zeros at the beginning
+        if (!$kpp || $kpp == '0'){
+                $i = 0;
+                while($i < 8){
+                        $trial_inn = $i ? '0' . $trial_inn : $inn;
+                        $res = check_company($trial_inn, '');
+                        if ($res['company_inn_valid'] &&
+$res['company_kpp_valid']){
+                                $inn = $trial_inn;
+                                $kpp = '';
+                                return true;
+                        }
+                        ++$i;
+                }
+                
+        }
+        else{
+                $j = 0;
+                while($j < 2){
+                        $trial_kpp = $j ? '0' . $trial_kpp : $kpp;
+                        $i = 0;
+                        while($i < 4){
+                                $trial_inn = $i ? '0' . $trial_inn :
+$inn;
+                                $res = check_company($trial_inn,
+$trial_kpp);
+                                if ($res['company_inn_valid'] &&
+$res['company_kpp_valid']){
+                                        $inn = $trial_inn;
+                                        $kpp = $trial_kpp;
+                                        return true;
+                                }
+                                ++$i;
+                        }
+                        ++$j;
+                }
+        }
+        
+        return false;
+}
+

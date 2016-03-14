@@ -1,0 +1,2469 @@
+﻿<?php
+/*
+error_reporting(E_ALL);
+ini_set('display_errors', TRUE);
+ini_set('display_startup_errors', TRUE);
+//header("Content-Type: text/html; charset=utf8");
+header("Content-Type: application/json"); 
+require_once 'PHPExcel/Classes/PHPExcel.php';
+require_once 'PHPExcel/Classes/PHPExcel/Worksheet.php';
+require_once 'PHPExcel/Classes/PHPExcel/IOFactory.php';
+*/	
+
+require_once('helpers.lib');
+
+define('PO_OBOSOB', 'По обособленному подразделению');
+define('PO_OBOSOB1', 'Обособленное подразделение');
+define('VOZVRAT', 'ВОЗВРАТЫ');
+
+define('ERROR_CODE_WRONG_DECLARATION_TYPE',             1);
+define('ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE',    2);
+define('ERROR_CODE_WRONG_VERTICAL_SEQUENCE',            3);
+define('ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE',          4);
+
+define('DESCRIPTION_WRONG_DECLARATION_TYPE', "Неверная форма в отчете: предполагалась %s, в отчете %s");
+define('DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE', "Для данного поставщика недопустима %s форма");
+define('DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE', "Ошибка в горизонтальной последовательности в %s колонке");
+define('DESCRIPTION_WRONG_VERTICAL_SEQUENCE', "Ошибка в вертикальной последовательности в %s строке");
+
+
+Class Transformer {
+	
+	public $path_to_file;
+	public $objPHPExcel;
+	public $supplier_inn;
+	public $supplier_kpp; 
+	public $declaration_type;
+	//public $kpp_client;
+	
+	public $error;
+	public $error_description;
+	
+	public function __construct($path, $type = 11) {
+		$this->path_to_file = $path;
+		$this->objPHPExcel = PHPExcel_IOFactory::load($this->path_to_file);
+		$this->objPHPExcel->setActiveSheetIndex(0);	
+		$this->declaration_type = $type;
+		$this->error = 0;
+		$this->error_description = "";
+		//$this->kpp_client = $kpp;
+	}
+	
+	public function definedFile() {	
+            
+         
+                
+             
+		/*********************************if alkomax*****************************/
+		try{
+			$data = $this->objPHPExcel->getSheet(0)->getCell('I18')->getValue();
+		}catch (Exception $e) {
+			echo 'Исключение: ',  $e->getMessage(), "\n";
+		}
+		$objWorksheet = $this->objPHPExcel->getActiveSheet();	
+		if ($data == "6167073575"){ 	
+			
+			$supplier_inn = $data;
+			$supplier_kpp = $this->objPHPExcel->getSheet(0)->getCell('J18')->getValue();
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;							
+			
+			$res = $this->testGorizontalSequence(13,2);
+			
+			/*if (is_numeric($res) && $this->declaration_type == 12){
+				$this->error = ERROR_CODE_WRONG_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_DECLARATION_TYPE, 11, 'alkomaks'); 				
+				return false;  
+			}*/
+			
+			if (!is_numeric($res)){ 			
+			}else{ 			
+				$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $res+1); 				
+				return false;  
+			}
+			$res1 = $this->testVerticalSequence(16,1);
+			if (!is_numeric($res1)){ 
+			}else{ 
+				$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+				return false; 
+			}			
+			
+			if ($this->declaration_type == 11){
+				$this->vozvrat_set(14, 2, 18);
+			}else{
+				$this->vozvrat_set(14, 2, 13);
+			}
+			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;
+		}			
+		
+		/*******************************if arsenal*******************************/
+		
+		$data = $this->objPHPExcel->getSheet(0)->getCell('A3')->getValue();
+		
+		$data = iconv("UTF-8", "cp1251",  $data);
+	
+		$pattern = '/(.*),.*\s(\d+)\/(\d+).*:\s(.*)\((.*?)\.(.*?)\.(.*?)\-(.*?)\.(.*?)\.(.*?)\)/';// inn and kpp	
+		/*
+		$matches[1] - name of provider
+		$matches[2] - inn provider
+		$matches[3] - kpp provider
+		$matches[4] - license provider
+		$matches[5] - actional date since for license provider
+		$matches[6] - actional date to for license provider
+		//fsrar
+		*/
+		preg_match($pattern, $data, $matches);		
+		//print_r($matches);
+		
+		$worksheet = $this->objPHPExcel->getActiveSheet();		
+		if (isset ($matches[2]) && $matches[2] == '6168019838'){ // arsenal
+			
+			$supplier_inn = $matches[2];
+			$supplier_kpp = $matches[3];
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			$worksheet->removeColumnByIndex(7);
+			$worksheet->removeColumnByIndex(6);
+			//print_r($matches);exit;
+			if ($this->declaration_type == 11){
+				$worksheet->insertNewColumnBeforeByIndex(6,7);
+				$this->objPHPExcel->getSheet(0)->getCell('G11')->setValue(iconv("cp1251", "UTF-8",  $matches[1]));			
+				$this->objPHPExcel->getSheet(0)->getCell('H11')->setValue($matches[2]);
+				$this->objPHPExcel->getSheet(0)->getCell('I11')->setValue($matches[3]);
+				$this->objPHPExcel->getSheet(0)->getCell('J11')->setValue(iconv("cp1251", "UTF-8",  $matches[4]));
+				$this->objPHPExcel->getSheet(0)->getCell('K11')->setValue($matches[5].".".$matches[6].".20".$matches[7]);
+				$this->objPHPExcel->getSheet(0)->getCell('L11')->setValue($matches[8].".".$matches[9].".20".$matches[10]);
+				//$this->objPHPExcel->getSheet(0)->getCell('M11')->setValue(iconv("cp1251", "UTF-8", 'ФСРАР'));
+				$this->objPHPExcel->getSheet(0)->getCell('M11')->setValue('ФСРАР');
+				$this->copyRange(6,11,12,0);
+			}else{
+				$worksheet->insertNewColumnBeforeByIndex(6,3);
+				$this->objPHPExcel->getSheet(0)->getCell('G11')->setValue(iconv("cp1251", "UTF-8",  $matches[1]));			
+				$this->objPHPExcel->getSheet(0)->getCell('H11')->setValue($matches[2]);
+				$this->objPHPExcel->getSheet(0)->getCell('I11')->setValue($matches[3]);
+				$this->copyRange(6,11,8,0);
+			}			
+			
+			$this->repearGorizontLine(1,8);						
+			
+			$this->deleteLinesMore500(11, 2);
+			$this->repearVerticalLine(11,0,0,8,0,0);
+			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			
+			return true;	
+		}
+		
+		
+		/*******************************if atlant*******************************/
+		$data = $this->objPHPExcel->getSheet(0)->getCell('C2')->getValue();
+		$pattern = '/(.*)\/(.*)/';
+		preg_match($pattern, $data, $matches);
+		//print_r($matches);
+		if (isset ($matches[1]) && $matches[1] == '6154101507'){ // atlant
+			
+			$supplier_inn = $matches[1];
+			$supplier_kpp = $matches[2];
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			$nameOrg_prev = $this->objPHPExcel->getSheet(0)->getCell('C1')->getValue();
+			$pattern = '/^(.*?),.*$/';
+			preg_match($pattern, $nameOrg_prev, $matches_name_org);
+			$nameOrg = iconv("UTF-8", "cp1251", $matches_name_org[1]);
+			$worksheet->insertNewColumnBeforeByIndex(6,3);
+			
+			$this->objPHPExcel->getSheet(0)->getCell('G16')->setValue(iconv("cp1251", "UTF-8",$nameOrg));
+			$this->objPHPExcel->getSheet(0)->getCell('H16')->setValue($matches[1]);
+			$this->objPHPExcel->getSheet(0)->getCell('I16')->setValue($matches[2]);			
+			
+			$this->copyRange(6,16,8,0);			
+			
+			$this->objPHPExcel->getSheet(0)->removeColumnByIndex(17);
+			if ($this->declaration_type  == 12){
+				$this->objPHPExcel->getSheet(0)->removeColumnByIndex(9,4); 
+			}
+			$this->repearGorizontLine(1, 15);
+			
+			
+			$this->deleteLinesMore500(16,2);
+			$this->repearVerticalLine(16,0,0,8,0,0);
+			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;	
+		}
+		
+		/*******************************if diskon*******************************/
+		$data = $this->objPHPExcel->getSheet(0)->getCellByColumnAndRow(8,18)->getValue();
+		if (isset ($data) && $data == '6167043796'){ // diskon
+			
+			$supplier_inn = $data;
+			$supplier_kpp = $this->objPHPExcel->getSheet(0)->getCellByColumnAndRow(9,18)->getValue();
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			$res = $this->testGorizontalSequence(13,2);
+			if (!is_numeric($res)){ 			
+			}else{ 			
+				$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $res+1); 				
+				return false;  
+			}
+			$res1 = $this->testVerticalSequence(17,1);
+			if (!is_numeric( $res1)){ 
+			}else{ 
+				$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+				return false; 
+			}		
+			
+			if ($this->declaration_type == 11){
+				$this->vozvrat_set(14, 2, 18);
+			}else{
+				$this->vozvrat_set(14, 2, 13);
+			}
+			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			
+			return true;
+		}
+		/*******************************if dkm*******************************/
+		try{
+			$data = $this->objPHPExcel->getSheet(0)->getCellByColumnAndRow(7,12)->getValue();
+		}catch(Exception $e){
+			echo $e->getMessage();
+		}
+		if (isset ($data) && $data == '6162063260'){ // dkm	
+			
+			$supplier_inn = $data;
+			$supplier_kpp = $this->objPHPExcel->getSheet(0)->getCellByColumnAndRow(8,12)->getValue();
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 11){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+				return false;
+			}
+			$this->formatDate(13, 12, 2);
+			//$this->objPHPExcel->getSheet(0)->getCellByColumnAndRow(0, 6)->setValue($this->objPHPExcel->getSheet(0)->getCellByColumnAndRow(0, 6)->getValue()." ".$this->kpp_client);
+			
+			
+			
+			$res = $this->testGorizontalSequence(11,1);
+			if (!is_numeric($res)){ 			
+			}else{ 			
+				$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $this->testGorizontalSequence(11,2)+1); 				
+				return false;  
+			}
+			$res1 = $this->testVerticalSequence(12,0);
+			if (!is_numeric( $res1)){ 
+			}else{ 
+				$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+				return false; 
+			}				
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;
+		}
+		/*******************************if donalko*******************************/		
+		$objWorksheet = $this->objPHPExcel->getActiveSheet();		
+		$highestRow = $objWorksheet->getHighestRow();										
+		$row=1;		
+		while ( ($objWorksheet->getCellByColumnAndRow(16, $row)->getValue() != '6166076647') && ($row<=$highestRow) ){
+			$row++;			
+		}
+		$current_inn = $objWorksheet->getCellByColumnAndRow(16, $row)->getValue();
+		if ($current_inn == '6166076647'){ // donalko
+			
+			$supplier_inn = $current_inn;
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(18, $row)->getValue();
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 11){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 	
+				return false;
+			}
+			
+			$index_for_del = $row - 3;
+			
+			$objWorksheet->insertNewColumnBeforeByIndex();
+			$objWorksheet->removeRow(1,$index_for_del);
+			$highestRow = $objWorksheet->getHighestRow();
+			$res = $this->testGorizontalSequence(1,5);
+			if (!is_numeric($res )){ 			
+			}else{ 			
+				$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $res+1); 				
+				return false;  
+			}
+			
+			$this->delHeader(5, 2, false);
+			
+			
+			$pattern = '/.*?:(.*?)\s.*?:(.*?)\s.*?:(.*?)\s.*?:.*/';
+			preg_match($pattern, $data, $matches);	
+			
+			//$this->findMoreKpp(3, $pattern, 5, 0, 6, 2);
+			
+			$this->repearVerticalLine(2,2,6,19,5,1);
+			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;	
+		}
+		
+		/*******************************if lotos*******************************/
+		$current_inn = $objWorksheet->getCellByColumnAndRow(7, 13)->getValue();
+		if ($current_inn == '2312106824' ){//lotos
+			
+			$supplier_inn = $current_inn;
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(8, 13)->getValue();
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 11){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 	
+				return false;
+			}
+			
+			
+			$res = $this->testGorizontalSequence(10,1);
+			if (!is_numeric( $res)){ 			
+			}else{ 			
+				$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $res+1); 				
+				return false;  
+			}
+			$res1 = $this->testVerticalSequence(12,0);
+			if (!is_numeric( $res1 )){ 
+			}else{ 
+				$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+				return false; 
+			}			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;
+		}
+		/*******************************if luding*******************************/ 
+		$current_inn = $objWorksheet->getCellByColumnAndRow(7, 9)->getValue();
+		if ($current_inn == '6166065518' ){//luding
+			//echo "jopa";exit;
+			$supplier_inn = $current_inn;
+			$supplier_kpp = '616645001';//$objWorksheet->getCellByColumnAndRow(8, 9)->getValue();
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 11){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 	
+				return false;
+			}
+			
+			$objWorksheet->removeColumnByIndex(17,3); 
+					
+			$this->formatDate(10, 9, 2);
+			$this->formatDate(11, 9, 2);
+			$this->formatDate(13, 9, 2);
+					
+			
+			
+			
+			$res = $this->testGorizontalSequence(7,1);
+			if (!is_numeric($res )){ 			
+			}else{ 			
+				$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $res+1); 				
+				return false;  
+			}
+			$res1 = $this->testVerticalSequence(9,0);
+			if (!is_numeric($res1 )){ 
+			}else{ 
+				$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+				return false; 
+			}
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);			
+			
+			return true;
+		}
+		/*******************************if megadon*******************************/
+		
+		$data = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow(0, 2)->getValue() );
+		$pattern = '/.*?\((.*?)\)/';
+		preg_match($pattern, $data, $matches);			
+		if (isset($matches[1]) && $matches[1] == '6165129448'){//megadon
+			
+			$supplier_inn = $matches[1];
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(4, 6)->getValue();
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 11){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 	
+				return false;
+			}
+			
+			$name_pro = 'ООО "ТД Мега-Дон"';
+			$data1 = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow(5, 6)->getValue() );
+			$pattern1 = '/^(.*?)\s.*?(\d+\.\d+\.\d+).*?(\d+\.\d+\.\d+).*?:\s(.*$)/';
+			/*
+			$matches1
+			[0] => 61ЗАП0003407 c 20.03.2014 по 01.01.2016 выдана: Федеральная служба по регулированию алкогольного рынка
+			[1] => 61ЗАП0003407
+			[2] => 20.03.2014
+			[3] => 01.01.2016
+			[4] => Федеральная служба по регулированию алкогольного рынка
+			*/
+			preg_match($pattern1, $data1, $matches1);			
+			$objWorksheet->removeColumnByIndex(5,1);
+			$objWorksheet->insertNewColumnBeforeByIndex(5,4);
+			
+			$this->objPHPExcel->getSheet(0)->getCell('F6')->setValue(iconv("cp1251", "UTF-8",$matches1[1]));
+			$this->objPHPExcel->getSheet(0)->getCell('G6')->setValue($matches1[2]);
+			$this->objPHPExcel->getSheet(0)->getCell('H6')->setValue($matches1[3]);
+			$this->objPHPExcel->getSheet(0)->getCell('I6')->setValue(iconv("cp1251", "UTF-8",$matches1[4]));
+			
+			$this->copyRange(5,6,8,0);
+			
+			$objWorksheet->insertNewColumnBeforeByIndex(4,2);
+			
+			$this->objPHPExcel->getSheet(0)->getCell('E6')->setValue($name_pro);
+			$this->objPHPExcel->getSheet(0)->getCell('F6')->setValue($matches[1]);
+			
+			$this->copyRange(4,6,5,0);
+			
+			$pattern = "/.*?:\s.*?\s(\d+).*/";
+			
+			//$data =  $objWorksheet->getCellByColumnAndRow(0, 3)->getValue() ;
+			//preg_match($pattern, $data, $matches);
+			//print_r($matches);exit;
+			
+			//findMoreKpp($start_row, $pattern, $col, $start_col_for_set_data, $col_for_campear_copy, $flag)
+			
+			//$this->findMoreKpp(2, $pattern, 0, 6, 2, 1);
+			
+			
+			$objWorksheet->insertNewColumnBeforeByIndex(0,2);
+						
+			$this->repearVerticalLine(6,0,4,8,0,0); //campere whith inn importer!!!!!!!!!!!
+			
+			$objWorksheet->insertNewRowBefore(6,1);			
+			$this->repearGorizontLine(1,6);
+			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			
+			return true;	
+		}
+		/*******************************if megapolis*******************************/
+		$objWorksheet = $this->objPHPExcel->getActiveSheet();		
+		$highestRow = $objWorksheet->getHighestRow();										
+		$row=1;		
+		while ( ($objWorksheet->getCellByColumnAndRow(28, $row)->getValue() != '7718502458') && ($row<=$highestRow) ){
+			$row++;			
+		}
+		$current_inn = $objWorksheet->getCellByColumnAndRow(28, $row)->getValue();
+		if ($current_inn == '7718502458'){ // megapolis
+			
+			$supplier_inn = $current_inn;
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(32, $row)->getValue();
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 11){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 	
+				return false;
+			}
+			
+			$tmp_row = $row - 4;
+			$objWorksheet->insertNewColumnBeforeByIndex();
+			$objWorksheet->removeRow(1,$tmp_row);
+			$res = $this->testGorizontalSequence(2,3);
+			if (!is_numeric( $res )){ 			
+			}else{ 			
+				$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $res+1); 				
+				return false;  
+			}
+                        //$this->delFooter();//number colum for compare
+			$res1 = $this->testVerticalSequence(4,1);
+                        //$this->repearVerticalLine(6,0,4,8,0,0);
+			if (!is_numeric($res1 )){ 
+			}else{ 
+				$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+				return false; 
+			}					
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;	
+		}
+		/*******************************if metro*******************************/
+		$current_inn = $objWorksheet->getCellByColumnAndRow(11, 5)->getValue();
+		if ($current_inn == '7704218694'){// metro
+			
+			$supplier_inn = $current_inn;
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(12, 5)->getValue();
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			
+			
+			$objWorksheet->removeColumnByIndex(0,5);
+			$objWorksheet->insertNewColumnBeforeByIndex(0,1);
+			
+			$this->repearVerticalLine(5,0,2,8,0,0);
+			$this->repearGorizontLine(1,4);
+			
+			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;	
+		}
+		/*******************************if mishelalko*******************************/
+		$current_inn = $objWorksheet->getCellByColumnAndRow(7, 12)->getValue();
+		if ($current_inn == '6125019230'){// mishelalko
+			
+			$supplier_inn = $current_inn;
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(8, 12)->getValue();
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 11){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 	
+				return false;
+			}
+			$this->formatDate(13, 12, 2);
+			$objWorksheet->removeColumnByIndex(17,1);
+			$res = $this->testGorizontalSequence(11,1);
+			if (!is_numeric($res)){ 			
+			}else{ 			
+				$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $res+1); 				
+				return false;  
+			}
+			$res1 = $this->testVerticalSequence(11,0);
+			if (!is_numeric($res1 )){ 
+			}else{ 
+				$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+				return false; 
+			}					
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;	
+		}
+		/*******************************if mozel*******************************/
+		$current_inn = $objWorksheet->getCellByColumnAndRow(8, 10)->getValue();
+		if ($current_inn == '7736186117'){// mozel
+			
+			$supplier_inn = $current_inn;
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(9, 10)->getValue();
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			$objWorksheet = $this->objPHPExcel->getActiveSheet();		
+			$highestRow = $objWorksheet->getHighestRow();	
+			$tmp_row = 10;
+			while ($tmp_row <= $highestRow){
+				$this->objPHPExcel->getSheet(0)->getCell('A'.$tmp_row)->setValue( $objWorksheet->getCellByColumnAndRow(2, $tmp_row)->getValue() );
+				$tmp_row++;
+			}
+			
+			$objWorksheet->removeColumnByIndex(2,2);
+			$objWorksheet->insertNewColumnBeforeByIndex();
+			$this->repearVerticalLine(10,0,2,7,0,0);
+			
+			$objWorksheet->insertNewColumnBeforeByIndex(16,1);
+			
+			$highestRow = $objWorksheet->getHighestRow();	
+			$tmp_row = 10;
+			while ($tmp_row <= $highestRow){
+				$this->objPHPExcel->getSheet(0)->getCell('Q'.$tmp_row)->setValue( $objWorksheet->getCellByColumnAndRow(9, $tmp_row)->getValue() );
+				$tmp_row++;
+			}
+			$objWorksheet->removeColumnByIndex(9,1);
+			$objWorksheet->removeColumnByIndex(17,4);
+			
+			$objWorksheet->insertNewRowBefore(10,1);
+			
+			$this->repearGorizontLine(1,10);
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;	
+		}
+		/*******************************if phanagoria*******************************/	
+		$current_inn = $objWorksheet->getCellByColumnAndRow(7, 11)->getValue();
+		if ($current_inn == '6164085043'){// phanagoria	
+			
+			$supplier_inn = $current_inn;
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(8, 11)->getValue();
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type == 12){					
+				$objWorksheet->removeColumnByIndex(9,4);
+				$this->repearGorizontLine(1,10);
+			}
+			
+			$res = $this->testGorizontalSequence(10,1);
+			if (!is_numeric($res)){ 			
+			}else{ 			
+				$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $res+1); 				
+				return false;  
+			}						
+			
+			$this->repearVerticalLine(11,0,2,8,0,0);
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;	
+		}
+		
+		/*******************************if phlagman (pivo)*******************************/						
+		$current_inn = $objWorksheet->getCellByColumnAndRow(8, 8)->getValue();
+		if ($current_inn == '6165152119'){// phanagoria	
+			$supplier_inn = $current_inn;
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(9, 8)->getValue();
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 12){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+				return false;
+			}
+			
+			$res = $this->testGorizontalSequence(7,2);
+			if (!is_numeric($res)){ 			
+			}else{ 			
+				$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $res+1); 				
+				return false;  
+			}	
+			$res1 = $this->testVerticalSequence(8,1);
+			if (!is_numeric( $res1)){ 
+			}else{ 
+				$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+				return false; 
+			}	
+			
+			return true;
+			
+		}
+		/*******************************if phlagman*******************************/				
+		$data = $objWorksheet->getCellByColumnAndRow(2, 2)->getValue();
+		$pattern = '/(\d+)\/(\d+)/';
+		
+		preg_match($pattern, $data, $matches);	
+		//print_r($matches);		
+		if (isset($matches[1]) && $matches[1] == '6167078492'){// phlagman
+			
+			$supplier_inn = $matches[1];
+			$supplier_kpp = $matches[2];
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			$name_pro = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow(2, 1)->getValue());
+			$objWorksheet->removeColumnByIndex(14,1);
+			$objWorksheet->insertNewColumnBeforeByIndex(6,3);
+			
+			$this->objPHPExcel->getSheet(0)->getCell('G16')->setValue(iconv("cp1251","UTF-8" , $name_pro) );
+			$this->objPHPExcel->getSheet(0)->getCell('H16')->setValue($matches[1]);
+			$this->objPHPExcel->getSheet(0)->getCell('I16')->setValue($matches[2]);			
+			$this->copyRange(6, 16, 8, 2);		
+			if ($this->declaration_type == 12){
+				$objWorksheet->removeColumnByIndex(9,4);			
+			}
+			$this->repearGorizontLine(1,15);
+			
+			$this->deleteLinesMore500(16,2);
+			// repearVerticalLine ($row_star_with, $column, $column_for_compare, $col_kpp, $col_kpp_str, $code){ // add for many kpp!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			if ($this->declaration_type == 12){
+				/*if ( is_numeric($objWorksheet->getCellByColumnAndRow(0, 16)->getValue()) ){
+					$this->repearVerticalLine(16,0,2,2,0,0);
+				}else{*/
+					$this->repearVerticalLine(16,0,2,2,0,0);
+				//}
+			}else{
+				$this->repearVerticalLine(16,0,2,8,0,0);
+			}
+			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			//??vertical sequience?
+			return true;	
+		}
+		/*******************************if rossi(mpf)*******************************/ 
+		$objWorksheet = $this->objPHPExcel->getActiveSheet();		
+		$highestRow = $objWorksheet->getHighestRow();	
+		$tmp_row = 1;
+		while ($tmp_row <= $highestRow){
+			$current_inn = $objWorksheet->getCellByColumnAndRow(7, $tmp_row)->getValue();
+			if ($current_inn =='6150006362' ){
+				break;
+			}
+			$tmp_row++;
+		}
+
+		if  ($current_inn =='6150006362' ){ //rossi
+			
+			$supplier_inn = $current_inn;
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(8, $tmp_row)->getValue();
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			$data = $objWorksheet->getCellByColumnAndRow(0, 5)->getValue() ;
+			$objWorksheet->removeRow(9,1);
+			$highestRow = $objWorksheet->getHighestRow();	
+			$tmp_row = 9;
+			while ($tmp_row <= $highestRow){
+				if ( $objWorksheet->getCellByColumnAndRow(0, $tmp_row)->getValue() == $data){
+					break;
+				}
+				
+				$tmp_row++;
+			}
+			if ( $objWorksheet->getCellByColumnAndRow(0, $tmp_row)->getValue() == $data){
+				$num_rows_for_del = $highestRow - $tmp_row;
+				$objWorksheet->removeRow($tmp_row,$num_rows_for_del);
+			}
+			if($this->declaration_type == 11){
+				$res = $this->testGorizontalSequence(8,1); 
+				if (!is_numeric($res)){ 			
+				}else{ 			
+					$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+					$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $res+1); 				
+					return false;  
+				}							
+			}else{
+				$objWorksheet->removeColumnByIndex(9,4);
+				$this->repearGorizontLine(1,8);
+				/*if (!is_numeric($this->testGorizontalSequence(8,1))){ 		
+				}else{ 			
+					$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+					$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $this->testGorizontalSequence(8,1)+1); 				
+					return false;  
+				}	*/			
+			}
+			
+			//$declaration_type = 1;
+			$this->deleteLinesMore500(12,2);
+			$this->repearVerticalLine(12,0,0,8,0,0);
+			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			
+			return true;	
+			
+		}
+		/*******************************if sovet*******************************/
+	
+		$data = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow(1, 7)->getValue());	//   pidori net v faile dannih po licensii!!!!!!!!!
+		$pattern = '/.*?\"(.*)\".*?:\s(\d+).*?:\s(\d+)/';
+		/*
+		[0] => по организации "Общество с ограниченной ответственностью "Совет"", ИНН: 6167037658, КПП: 610201001
+		[1] => Общество с ограниченной ответственностью "Совет"
+		[2] => 6167037658
+		[3] => 610201001
+		*/
+		preg_match($pattern, $data, $matches);	
+		
+		if  (isset($matches[2]) && $matches[2] =='6167037658' ){ //sovet
+			
+			$supplier_inn = $matches[2];
+			$supplier_kpp = $matches[3];
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 11){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 	
+				return false;
+			}
+			
+			$objWorksheet->removeColumnByIndex(6,11);
+			
+			$objWorksheet->insertNewColumnBeforeByIndex(6,7);
+			$this->objPHPExcel->getSheet(0)->getCell('G8')->setValue(iconv("cp1251","UTF-8" , $matches[1]) );
+			$this->objPHPExcel->getSheet(0)->getCell('H8')->setValue(iconv("cp1251","UTF-8" , $matches[2]) );
+			$this->objPHPExcel->getSheet(0)->getCell('I8')->setValue(iconv("cp1251","UTF-8" , $matches[3]) );
+			$this->objPHPExcel->getSheet(0)->getCell('J8')->setValue('61ЗАП0001418');
+			$this->objPHPExcel->getSheet(0)->getCell('K8')->setValue('11.12.2012');
+			$this->objPHPExcel->getSheet(0)->getCell('L8')->setValue('11.12.2016');  // before 2016  - change!!!!!!
+			$this->objPHPExcel->getSheet(0)->getCell('M8')->setValue('ФСРАР');
+		
+			$this->copyRange(6, 8, 12, 0);
+			
+			$this->repearGorizontLine(1,6);
+			
+			$this->delHeader(1, 7, true);
+			
+			$res1 = $this->testVerticalSequence(8,0);
+			if (!is_numeric($res1 )){ 
+			}else{ 
+				$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+				return false; 
+			}		
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;		
+		}
+		/*******************************exvair*******************************/
+	
+		
+                if ($objWorksheet->getCellByColumnAndRow(7, 8)->getValue() == '6140029628'){ 
+				
+                    $supplier_inn = $objWorksheet->getCellByColumnAndRow(7, 8)->getValue();
+                    $supplier_kpp = $objWorksheet->getCellByColumnAndRow(8, 8)->getValue();
+                    $res = validate_company($supplier_inn, $supplier_kpp);
+                    if (!$res){
+                            return false;
+                    }
+
+                    $this->supplier_inn = $supplier_inn;
+                    $this->supplier_kpp = $supplier_kpp;
+                    
+                    if ($this->declaration_type != 12){
+                            $this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+                            $this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+                            return false;
+                    }
+                    $this->repearGorizontLine(1,6);
+                    //$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+					//$objWriter->save($this->path_to_file);
+                    
+                    return true;	
+                }
+                
+                
+                
+                
+		/*******************************mix*******************************/
+		if ($objWorksheet->getCellByColumnAndRow(7, 7)->getValue() == '6125019287'){ //mix
+			$supplier_inn = $objWorksheet->getCellByColumnAndRow(7, 7)->getValue();
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(8, 7)->getValue();
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 12){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+				return false;
+			}
+			
+			$this->formatDate(9,7,2);
+			//formatDate($colmn, $row, $compear_wiht){
+			//$this->mixDate(9, 7, 2);
+			
+			$res = $this->testGorizontalSequence(6,1);
+			if (!is_numeric( $res )){ 			
+			}else{ 			
+				$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $res+1); 				
+				return false;  
+			}
+			$res1 = $this->testVerticalSequence(7,0);
+			if (!is_numeric( $res1)){ 
+			}else{ 
+				$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+				return false; 
+			}			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);			
+			return true;					
+		}		
+		/*******************************nadejda*******************************/
+		if ($objWorksheet->getCellByColumnAndRow(7, 9)->getValue() == '6452105553'){
+			$supplier_inn = $objWorksheet->getCellByColumnAndRow(7, 9)->getValue();
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(8, 9)->getValue();
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 12){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+				return false;
+			}
+			
+			$res = $this->testGorizontalSequence(1,7);
+			if (!is_numeric($res)){ 			
+			}else{ 			
+				$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $res+1); 				
+				return false;  
+			}						
+			
+			$highestRow = $objWorksheet->getHighestRow();	
+			$tmp_row = 8;
+			while  ($tmp_row<=$highestRow) {
+				$data = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow(1, $tmp_row)->getValue() );
+				$pattern = '/^(.*?):.*$/';
+				preg_match($pattern, $data, $matches);
+				//print_r($matches); exit;
+				if ( !isset($matches[1]) || $matches[1] != iconv("UTF-8", "cp1251", PO_OBOSOB)){
+					$tmp_row++;			
+				}else{
+					break;
+				}
+			}
+		
+			if (isset($matches[1]) && $matches[1] == iconv("UTF-8", "cp1251", PO_OBOSOB)){
+				//echo "\n\n\n".$tmp_row."\n\n";exit;
+				$tmp = $tmp_row - 8;
+				$objWorksheet->removeRow(8,$tmp);
+				$highestRow = $objWorksheet->getHighestRow();
+			}else{
+				//ERROR
+			}					
+			
+			$this->repearVerticalLine(8,0,4,8,0,0);			
+			
+			$tmp_row = 8;
+			while  ($tmp_row<=$highestRow) {
+				$data = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow(1, $tmp_row)->getValue() );
+				$pattern = '/^(.*?):.*$/';
+				preg_match($pattern, $data, $matches);
+				//print_r($matches); exit;
+				if ( !isset($matches[1]) || $matches[1] != iconv("UTF-8", "cp1251", PO_OBOSOB)){
+					$tmp_row++;			
+				}else{
+					$tmp_row++;
+					$this->repearVerticalLine($tmp_row,0,4,8,0,0);
+				}
+			}
+			
+			
+		//	$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);	
+			return true;						
+		}
+		/*******************************nikos*******************************/
+		if ($objWorksheet->getCellByColumnAndRow(7, 8)->getValue() == '6168047458'){
+			$supplier_inn = $objWorksheet->getCellByColumnAndRow(7, 8)->getValue();
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(8, 8)->getValue();
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 12){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+				return false;
+			}
+			
+			$this->formatDate(9, 8, 2);
+			
+			$res = $this->testGorizontalSequence(1,7);
+			if (!is_numeric($res)){ 			
+			}else{ 			
+				$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $res+1); 				
+				return false;  
+			}						
+			$this->repearVerticalLine(8,0,2,8,0,0);						
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);			
+			return true;			
+		}
+		/*******************************rpk*******************************/
+		
+                       
+        $data = iconv( "UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow(1, 2)->getValue());
+		//$data = $objWorksheet->getCellByColumnAndRow(1, 2)->getValue();
+		//print_r($data);exit;
+		$pattern = '/.*?\"(.*?)\".*?:\s(\d+)\s.*?\s(\d+)/';
+		/*
+		[0] => по организации "Общество с ограниченной ответственностью "rpk"", 
+		[1] => Общество с ограниченной ответственностью "rpk"
+		[2] => 6168029787
+		[3] => 616201001
+		*/
+		preg_match($pattern, $data, $matches);	
+		//print_r($matches);exit;
+		if  (isset($matches[2]) && $matches[2] =='6168029787' ){
+                    $supplier_inn = $matches[2];
+                    $supplier_kpp = $matches[3];
+                    $res = validate_company($supplier_inn, $supplier_kpp);
+                    if (!$res){
+                            return false;
+                    }
+
+                    $this->supplier_inn = $supplier_inn;
+                    $this->supplier_kpp = $supplier_kpp;
+
+                    if ($this->declaration_type != 12){
+                            $this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+                            $this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+                            return false;
+                    }
+					
+                    $objWorksheet->removeColumnByIndex(24,1);
+                   
+                    $objWorksheet->getCellByColumnAndRow(21,14)->setValue(iconv("cp1251","UTF-8" , $matches[1]) );
+                    $objWorksheet->getCellByColumnAndRow(23,14)->setValue(iconv("cp1251","UTF-8" , $matches[2]) );
+                    $objWorksheet->getCellByColumnAndRow(24,14)->setValue(iconv("cp1251","UTF-8" , $matches[3]) );                    
+                    $this->copyRange(21, 14, 25, 13);
+					
+					//$objWorksheet->removeColumnByIndex(22,2);
+					$objWorksheet->getCellByColumnAndRow(2,14)->setValue('пиво');                    					
+					$this->copyRange(2, 14, 2, 13);
+					
+					$objWorksheet->removeColumnByIndex(2,1);
+					$objWorksheet->getCellByColumnAndRow(26,13)->setValue(11 );                    
+					
+					
+                    $this->repearGorizontLineByNumber(2,13);
+                   
+					//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+					//$objWriter->save($this->path_to_file);			
+                    
+                    return true;
+                }
+                
+                /*$objWorksheet = $this->objPHPExcel->getActiveSheet();		
+		$highestRow = $objWorksheet->getHighestRow();								
+		
+		$row=1;
+		
+		while ( ($objWorksheet->getCellByColumnAndRow(7, $row)->getValue() != '2635056024') && ($row<=$highestRow) ){
+			$row++;			
+		}
+		$current_inn = $objWorksheet->getCellByColumnAndRow(7, $row)->getValue();
+		if ($current_inn == '2635056024'){ 
+			
+			$supplier_inn = $current_inn;
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(8, $row)->getValue();
+			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 12){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+				return false;
+			}									
+			
+			
+			$objWorksheet->insertNewColumnBeforeByIndex(3,3);
+			$objWorksheet->removeColumnByIndex(12,1);
+			$objWorksheet->insertNewColumnBeforeByIndex(12,3);
+			
+			$tmp_row = $row;
+			while ($tmp_row<=$highestRow){
+				if ($objWorksheet->getCellByColumnAndRow( 15, $tmp_row)->getValue() < 0){
+					$objWorksheet->removeRow($tmp_row,1);
+					$highestRow = $objWorksheet->getHighestRow();
+				}else{
+					$tmp_row++;
+				}				
+			}
+			
+			
+			$this->repearGorizontLine(4,9);
+			
+			$code_alko = $objWorksheet->getCellByColumnAndRow( 1, $row-1)->getValue();
+			
+			$tmp_row = $row;
+			$highestRow = $objWorksheet->getHighestRow();
+			while ($tmp_row<=$highestRow){
+				if ($objWorksheet->getCellByColumnAndRow( 1, $tmp_row-1)->getValue() != $code_alko && is_numeric($objWorksheet->getCellByColumnAndRow( 1, $tmp_row-1)->getValue()) ){
+					$code_alko = $objWorksheet->getCellByColumnAndRow( 1, $tmp_row-1)->getValue();
+				}
+				$objWorksheet->getCellByColumnAndRow(5,$tmp_row)->setValue($code_alko);									
+				$tmp_row++;
+			}
+			
+			$tmp_row = $row;
+			$highestRow = $objWorksheet->getHighestRow();
+			while ($tmp_row<=$highestRow){
+				$data = $objWorksheet->getCellByColumnAndRow(2, $tmp_row)->getValue();			
+				$pattern = '/^(.*?)\s\((.*?)\)$/x';
+				preg_match($pattern, $data, $matches);
+				$data1 = $matches[1];
+				$pattern1 = '/^.*?(\d+)$/';
+				preg_match($pattern1, $data1, $matches1);
+				$number_nakl = "P".$matches1[1];			
+				$date_nakl = $matches[2];
+				
+				$objWorksheet->getCellByColumnAndRow(12,$tmp_row)->setValue($date_nakl);									
+				$objWorksheet->getCellByColumnAndRow(13,$tmp_row)->setValue($number_nakl);									
+				$tmp_row++;
+			}
+			
+			
+			$objWorksheet->removeRow(8,1);
+			$objWorksheet->removeColumnByIndex(1,2); 
+			
+			$objWorksheet->getCellByColumnAndRow(7,9)->setValue("ООО 'РПК плюс'");
+			$objWorksheet->getCellByColumnAndRow(8,9)->setValue("6168029787");
+			$objWorksheet->getCellByColumnAndRow(9,9)->setValue("616201001");
+			$this->copyRange(7,9,9,3);
+			$this->repearVerticalLine(9,1,5,9,0,0);
+			
+							
+			return true;	
+		}*/
+		/*******************************true company*******************************/
+		$data = $objWorksheet->getCellByColumnAndRow(2, 1)->getValue();
+		
+		$pattern = '/^(.*?),.*?:\s(\d+),.*?:\s(\d+)$/';
+		preg_match($pattern, $data, $matches);
+		if (isset($matches[1])){
+			$name_company = iconv("UTF-8", "cp1251",$matches[1]);
+		}
+		if (isset($matches[2])){
+			$inn_company = $matches[2];
+		}
+		if (isset($matches[3])){
+			$kpp_company = $matches[3];
+		}
+		
+		if ( isset($inn_company) && $inn_company == '6154127865'){
+			$supplier_inn = $inn_company;
+			$supplier_kpp = $kpp_company;
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 12){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+				return false;
+			}
+			
+			$objWorksheet->removeColumnByIndex(6,4);
+			$objWorksheet->insertNewColumnBeforeByIndex(6,3);			
+			$objWorksheet->getCellByColumnAndRow(6,12)->setValue(iconv("cp1251", "UTF-8",$name_company));
+			$objWorksheet->getCellByColumnAndRow(7,12)->setValue($inn_company);
+			$objWorksheet->getCellByColumnAndRow(8,12)->setValue($kpp_company);
+			
+			$this->copyRange(6,12,8,2);
+			
+			$this->repearGorizontLine(1,8);
+			$this->repearVerticalLine(12,0,0,8,0,0);
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;			
+		}
+		/*******************************ugplus*******************************/
+		if ($objWorksheet->getCellByColumnAndRow(7, 9)->getValue() == '6452104158'){
+			$supplier_inn = $objWorksheet->getCellByColumnAndRow(7, 9)->getValue();
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(8, 9)->getValue();
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 12){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+				return false;
+			}
+			
+			$res = $this->testGorizontalSequence(1,7);
+			if (!is_numeric( $res)){ 			
+			}else{ 			
+				$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $res+1); 				
+				return false;  
+			}						
+			
+			$highestRow = $objWorksheet->getHighestRow();	
+			$tmp_row = 8;
+			while  ($tmp_row<=$highestRow) {
+				$data = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow(1, $tmp_row)->getValue() );
+				$pattern = '/^(.*?):.*$/';
+				preg_match($pattern, $data, $matches);
+				//print_r($matches); exit;
+				if ( !isset($matches[1]) || $matches[1] != iconv("UTF-8", "cp1251", PO_OBOSOB)){
+					$tmp_row++;			
+				}else{
+					break;
+				}
+			}
+			if (isset($matches[1]) && $matches[1] == iconv("UTF-8", "cp1251", PO_OBOSOB)){
+				//echo "\n\n\n".$tmp_row."\n\n";exit;
+				$tmp = $tmp_row - 8;
+				$objWorksheet->removeRow(8,$tmp);
+				$highestRow = $objWorksheet->getHighestRow();
+			}else{
+				//ERROR
+			}		
+			$res1 = $this->testVerticalSequence(9,0);
+			if (!is_numeric( $res1)){ 
+			}else{ 
+				$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+				return false; 
+			}		
+
+			$tmp_row = 8;
+			while  ($tmp_row<=$highestRow) {
+				$data = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow(1, $tmp_row)->getValue() );
+				$pattern = '/^(.*?):.*$/';
+				preg_match($pattern, $data, $matches);
+				//print_r($matches); exit;
+				if ( !isset($matches[1]) || $matches[1] != iconv("UTF-8", "cp1251", PO_OBOSOB)){
+					$tmp_row++;			
+				}else{
+					$tmp_row++;
+					$this->repearVerticalLine($tmp_row,0,4,8,0,0);
+				}
+			}
+			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			
+			return true;
+		}
+		/*******************************vakula*******************************/
+		if ($objWorksheet->getCellByColumnAndRow(4, 7)->getValue() == '7830001405'){
+			
+			$supplier_inn = $objWorksheet->getCellByColumnAndRow(4, 7)->getValue();
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(5, 7)->getValue();
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 12){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+				return false;
+			}
+			
+			$res = $this->testGorizontalSequence(1,6);
+			if (!is_numeric($res )){ 			
+			}else{ 			
+				$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $res+1); 				
+				return false;  
+			}
+						
+			$tmp_row = 7;
+			$tmp_row_2 = 0;
+			$tmp = 1;
+			$end_row =0;
+			$highestRow = $objWorksheet->getHighestRow();	
+			$flag = true;
+			while  ($tmp<=$highestRow) {
+				if (is_numeric( $objWorksheet->getCellByColumnAndRow(0, $tmp_row)->getValue()) && is_numeric( $objWorksheet->getCellByColumnAndRow(2, $tmp_row)->getValue()) ){
+					$tmp_row++;
+				}elseif (is_numeric( $objWorksheet->getCellByColumnAndRow(0, $tmp_row)->getValue()) && $flag  ){
+					$end_row = $tmp_row;
+					$tmp_row_2++;
+					$tmp_row++;
+					$flag = false;
+				}elseif(is_numeric( $objWorksheet->getCellByColumnAndRow(0, $tmp_row)->getValue()) && !$flag){
+					$tmp_row++;
+					$tmp_row_2++;
+				}
+				$tmp++;
+			}
+			$r = $tmp_row_2+$end_row;
+			//echo "\n".$end_row." - ".$r."\n";exit;
+			$objWorksheet->removeRow($end_row,$r);
+			$res1 = $this->testVerticalSequence(7,0);					
+			
+			if (!is_numeric( $res1 )){ 
+			}else{ 
+				$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+				return false; 
+			}			
+			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;
+		}
+		/*******************************varag*******************************/
+		if ($objWorksheet->getCellByColumnAndRow(8, 8)->getValue() == '6161059944'){
+			$supplier_inn = $objWorksheet->getCellByColumnAndRow(8, 8)->getValue();
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(9, 8)->getValue();
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 12){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+				return false;
+			}
+			
+			$res = $this->testGorizontalSequence(2,7);
+			if (!is_numeric($res)){ 			
+			}else{ 			
+				$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $res+1);
+				return false;  
+			}
+			$res1 = $this->testVerticalSequence(8,1);
+			if (!is_numeric($res1 )){ 
+			}else{ 
+				$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+				return false; 
+			}			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;
+		}
+		/*******************************vesta*******************************/
+		if ( trim( $objWorksheet->getCellByColumnAndRow(8, 12)->getValue()) == '6165105655'){
+			$supplier_inn = trim($objWorksheet->getCellByColumnAndRow(8, 12)->getValue());
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(9, 12)->getValue();			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 12){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+				return false;
+			}
+			
+			$objWorksheet->removeColumnByIndex(10,4);
+			$objWorksheet->removeColumnByIndex(12,1);
+			$this->repearGorizontLine(1,9);
+			$this->repearVerticalLine(12,0,3,9,0,0);
+			//echo "jopa";exit;
+			//$this->vestaDate(10, 12, 3);
+
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;
+		}
+                /*******************************venecia*******************************/
+		if ( trim( $objWorksheet->getCellByColumnAndRow(8, 12)->getValue()) == '6168023633'){
+			$supplier_inn = trim($objWorksheet->getCellByColumnAndRow(8, 12)->getValue());
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(9, 12)->getValue();			
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 12){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+				return false;
+			}
+			
+			$objWorksheet->removeColumnByIndex(10,4);
+			$objWorksheet->removeColumnByIndex(12,1);
+			$this->repearGorizontLine(1,9);
+			$this->repearVerticalLine(12,0,3,9,0,0);
+			//echo "jopa";exit;
+			//$this->vestaDate(10, 12, 3);
+
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;
+		}
+		/*******************************vvp*******************************/
+		if ( trim( $objWorksheet->getCellByColumnAndRow(8, 8)->getValue()) == '6161037468'){			
+			$supplier_inn = trim($objWorksheet->getCellByColumnAndRow(8, 8)->getValue());			
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(9, 8)->getValue();		
+			$res = validate_company($supplier_inn, $supplier_kpp);			
+			if (!$res){
+				return false;
+			}			
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 12){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+				return false;
+			}
+			
+			$res = $this->testGorizontalSequence(2,7);
+			if (!is_numeric($res )){ 			
+			}else{ 			
+				$this->error = ERROR_CODE_WRONG_HORIZONTAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_HORIZONTAL_SEQUENCE, $res+1); 				
+				return false;  
+			}
+			$res1 = $this->testVerticalSequence(8,1);
+			if (!is_numeric( $res1)){ 
+			}else{ 
+				$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+				return false; 
+			}			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;
+		}
+		/*******************************center*******************************/
+		if ( $objWorksheet->getCellByColumnAndRow(8, 8)->getValue() == '6164306334'){//!!!!!!!!!!!!!!!!!!!!!!! code 260 - is bear???
+			$supplier_inn = $objWorksheet->getCellByColumnAndRow(8, 8)->getValue();			
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(9, 8)->getValue();		
+			$res = validate_company($supplier_inn, $supplier_kpp);			
+			if (!$res){
+				return false;
+			}			
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 12){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+				return false;
+			}
+			
+			$objWorksheet->removeColumnByIndex(10,7);
+			$objWorksheet->removeColumnByIndex(7,1);
+			$this->repearGorizontLine(1,6);
+			
+			$tmp_row = 7;
+			$highestRow = $objWorksheet->getHighestRow();	
+			$flag = false;
+			while  ($tmp_row<=$highestRow) {			
+			
+				$main_str = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow(1, $tmp_row)->getValue() );
+				$str = mb_strtolower( PO_OBOSOB,  'UTF-8');
+				$my_str = iconv("UTF-8", "cp1251", $str );
+				$pos = strpos($main_str, $my_str);
+				if ($pos === false) {
+					$tmp_row++;
+					//echo 'not found'.PHP_EOL;
+				}else{
+					$flag = true;
+					break;
+				}				
+				
+				
+			}
+			
+			if ($flag){
+				$data = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow(1, $tmp_row)->getValue() );				
+				$pattern = '/^(.*?):\s(\d+).*?:\s(\d+).*?:\s(.*)$/';				
+				preg_match($pattern, $data, $matches);
+				$objWorksheet->removeRow(7, $tmp_row-8);
+				/*
+				$matches[2] => 6168019838
+				$matches[3] => 616845001
+				$matches[4] => 344090, Ростовская обл, Ростов-на-Дону г, Доватора ул, дом № 148
+				*/		
+				
+			}
+			
+			$this->repearVerticalLine(9,0,2,8,0,0);
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);			
+			return true;
+		}
+		/*******************************legion*******************************/
+		if ( $objWorksheet->getCellByColumnAndRow(7, 9)->getValue() == '6164273199'){
+			$supplier_inn = $objWorksheet->getCellByColumnAndRow(7, 9)->getValue();			
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(8, 9)->getValue();		
+			$res = validate_company($supplier_inn, $supplier_kpp);			
+			if (!$res){
+				return false;
+			}			
+			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			if ($this->declaration_type != 12){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+				return false;
+			}
+			
+			$objWorksheet->removeColumnByIndex(9,4);
+			$this->repearGorizontLine(1,7);		
+			$res1 = $this->testVerticalSequence(9,0);
+			if (!is_numeric( $res1 )){ 
+			}else{ 
+				$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+				return false; 
+			}
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;
+		}
+		/*******************************alkomir*******************************/				
+		$data = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow(1, 7)->getValue() );		
+		$pattern = '/^.*?\"(.*)\".*?:\s(\d+).*?:\s(\d+).*$/';
+		preg_match($pattern, $data, $matches);
+		/*
+		matches[1] => Общество с ограниченной ответственностью "Алко-Мир"
+		matches[2] => 5035042138
+		matches[3] => 772945001
+		*/
+		//print_r($matches);exit;
+		if ( isset($matches[2]) && $matches[2] == '5035042138'){
+			$supplier_inn = $matches[2];			
+			$supplier_kpp = $matches[3];		
+			$res = validate_company($supplier_inn, $supplier_kpp);			
+			if (!$res){
+				return false;
+			}			
+					
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			$name_client = $objWorksheet->getCellByColumnAndRow(6, 8)->getValue();
+			$inn_client = $objWorksheet->getCellByColumnAndRow(8, 8)->getValue();
+			$kpp_client = $objWorksheet->getCellByColumnAndRow(9, 8)->getValue();
+			
+			
+			
+			if ($this->declaration_type != 11){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 	
+				return false;
+			}
+			
+			$res = $this->delHeader(1, 7, true);
+			
+			
+			
+			$objWorksheet->removeColumnByIndex(6,11);
+			$objWorksheet->insertNewColumnBeforeByIndex(6,3);
+			$objWorksheet->insertNewColumnBeforeByIndex(9,4);
+			$objWorksheet->getCellByColumnAndRow(6,7)->setValue(iconv("cp1251", "UTF-8", $matches[1]));
+			$objWorksheet->getCellByColumnAndRow(7,7)->setValue($matches[2]);
+			$objWorksheet->getCellByColumnAndRow(8,7)->setValue($matches[3]);
+			
+			$objWorksheet->getCellByColumnAndRow(9,7)->setValue('50ЗАП0002028');
+			$objWorksheet->getCellByColumnAndRow(10,7)->setValue('13.08.2013');
+			$objWorksheet->getCellByColumnAndRow(11,7)->setValue('13.08.2018');
+			$objWorksheet->getCellByColumnAndRow(12,7)->setValue('ФСРАР');
+			
+			$this->copyRange(6,7,12,2);
+			
+			$this->repearGorizontLine(1,6);
+			$objWorksheet->getCellByColumnAndRow(1, 7)->setValue($name_client." ".$inn_client." ".$kpp_client);
+			if ($res != false ){
+				//$tmp_row = $res;
+				$pattern = '/^.*?\"(.*?)\".*?:\s(\d+).*?:\s(\d+).*$/';	
+				$this->findMoreKpp(7, $pattern, 1, 6, 2, 0);
+				
+			}
+			
+			
+			/*
+			$objWorksheet->removeColumnByIndex(6,11);
+			$objWorksheet->insertNewColumnBeforeByIndex(6,3);
+			$this->repearGorizontLine(1,6);
+			
+			$objWorksheet->getCellByColumnAndRow(6,9)->setValue('Алко-Мир');////////  loop for all kpp!!!!!!!!!!!!!!!!
+			$objWorksheet->getCellByColumnAndRow(7,9)->setValue($matches[1]);
+			$objWorksheet->getCellByColumnAndRow(8,9)->setValue($matches[2]);
+			
+			
+			
+			$this->copyRange(6,9,8,2);
+			*/
+			
+			$res1 = $this->testVerticalSequence(8,0);
+			if (!is_numeric( $res1 )){ 
+			}else{ 
+				$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+				return false; 
+			}	
+			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;
+		}
+		/*******************************MAK*******************************/				
+		$data = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow(1, 7)->getValue() );		
+		$pattern = '/^.*?\"(.*)\".*?:\s(\d+).*?:\s(\d+).*$/';
+		preg_match($pattern, $data, $matches);
+		/*
+		matches[1] => Общество с ограниченной ответственностью "МАК"
+		matches[2] => 5035043205
+		matches[3] => 503501001
+		*/
+		//print_r($matches);exit;
+		if ( isset($matches[2]) && $matches[2] == '5035043205'){
+			$supplier_inn = $matches[2];			
+			$supplier_kpp = $matches[3];		
+			$res = validate_company($supplier_inn, $supplier_kpp);			
+			if (!$res){
+				return false;
+			}			
+					
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			$name_client = $objWorksheet->getCellByColumnAndRow(6, 8)->getValue();
+			$inn_client = $objWorksheet->getCellByColumnAndRow(8, 8)->getValue();
+			$kpp_client = $objWorksheet->getCellByColumnAndRow(9, 8)->getValue();
+			
+			
+			
+			if ($this->declaration_type != 11){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 	
+				return false;
+			}
+			
+			$res = $this->delHeader(1, 7, true);
+			
+			
+			
+			$objWorksheet->removeColumnByIndex(6,11);
+			$objWorksheet->insertNewColumnBeforeByIndex(6,3);
+			$objWorksheet->insertNewColumnBeforeByIndex(9,4);
+			$objWorksheet->getCellByColumnAndRow(6,7)->setValue(iconv("cp1251", "UTF-8", $matches[1]));
+			$objWorksheet->getCellByColumnAndRow(7,7)->setValue($matches[2]);
+			$objWorksheet->getCellByColumnAndRow(8,7)->setValue($matches[3]);
+			
+			$objWorksheet->getCellByColumnAndRow(9,7)->setValue('50ЗАП0002028');
+			$objWorksheet->getCellByColumnAndRow(10,7)->setValue('13.08.2013');
+			$objWorksheet->getCellByColumnAndRow(11,7)->setValue('13.08.2018');
+			$objWorksheet->getCellByColumnAndRow(12,7)->setValue('ФСРАР');
+			
+			$this->copyRange(6,7,12,2);
+			
+			$this->repearGorizontLine(1,6);
+			$objWorksheet->getCellByColumnAndRow(1, 7)->setValue($name_client." ".$inn_client." ".$kpp_client);
+			if ($res != false ){
+				//$tmp_row = $res;
+				$pattern = '/^.*?\"(.*?)\".*?:\s(\d+).*?:\s(\d+).*$/';	
+				$this->findMoreKpp(7, $pattern, 1, 6, 2, 0);
+				
+			}
+			
+			
+			/*
+			$objWorksheet->removeColumnByIndex(6,11);
+			$objWorksheet->insertNewColumnBeforeByIndex(6,3);
+			$this->repearGorizontLine(1,6);
+			
+			$objWorksheet->getCellByColumnAndRow(6,9)->setValue('Алко-Мир');////////  loop for all kpp!!!!!!!!!!!!!!!!
+			$objWorksheet->getCellByColumnAndRow(7,9)->setValue($matches[1]);
+			$objWorksheet->getCellByColumnAndRow(8,9)->setValue($matches[2]);
+			
+			
+			
+			$this->copyRange(6,9,8,2);
+			*/
+			
+			$res1 = $this->testVerticalSequence(8,0);
+			if (!is_numeric( $res1 )){ 
+			}else{ 
+				$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+				return false; 
+			}	
+			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;
+		}
+		
+		/*******************************vosxod*******************************/		
+		$data = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow(14, 9)->getValue() );		
+		$pattern = '/^(.*?),.*?(\d+).*?(\d+)\s+(.*?)$/';
+		preg_match($pattern, $data, $matches);
+		//print_r($matches);exit;
+		if (isset($matches[2])&&($matches[2] == 6168013949)){ //vosxod
+			//print_r("jopa");exit;		
+			$supplier_inn = $matches[2];			
+			$supplier_kpp = $matches[3];		
+			$res = validate_company($supplier_inn, $supplier_kpp);			
+			if (!$res){
+				return false;
+			}			
+					
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			
+			$worksheet->removeColumnByIndex(11, 14);
+			$objWorksheet->insertNewColumnBeforeByIndex(10,3);
+			
+			$this->objPHPExcel->getSheet(0)->getCell('L10')->setValue(iconv("cp1251", "UTF-8",$matches[1]));
+			$this->objPHPExcel->getSheet(0)->getCell('M10')->setValue($matches[2]);
+			$this->objPHPExcel->getSheet(0)->getCell('N10')->setValue($matches[3]);
+			//kostil!!!!!!!!!!!!!!!!!!!!!!
+			$this->objPHPExcel->getSheet(0)->getCell('L7')->setValue(6);
+			$this->objPHPExcel->getSheet(0)->getCell('M7')->setValue(7);
+			$this->objPHPExcel->getSheet(0)->getCell('N7')->setValue(8);
+			
+			$this->objPHPExcel->getSheet(0)->getCell('O7')->setValue(9);
+			$this->objPHPExcel->getSheet(0)->getCell('P7')->setValue(10);
+			$this->objPHPExcel->getSheet(0)->getCell('Q7')->setValue(11);
+			$this->objPHPExcel->getSheet(0)->getCell('S7')->setValue(12);
+			
+			$this->copyRange(11,10,13,4);
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;
+		
+		}
+		
+		/*******************************millenium*******************************/	
+		
+		if ( $objWorksheet->getCellByColumnAndRow(7, 8)->getValue() == '6168054279'){
+			$supplier_inn = $objWorksheet->getCellByColumnAndRow(7, 8)->getValue();			
+			$supplier_kpp = $objWorksheet->getCellByColumnAndRow(8, 8)->getValue();	
+			$res = validate_company($supplier_inn, $supplier_kpp);			
+			if (!$res){
+				return false;
+			}			
+					
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			//($column, $start_row, $flag)
+			
+			
+			// repearVerticalLine ($row_star_with, $column, $column_for_compare, $col_kpp, $col_kpp_str, $code){ // add for many kpp!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+			
+			$this->repearVerticalLine(8,0,2,8,0,1);
+			
+			if ($this->declaration_type != 12){
+				$this->error = ERROR_CODE_WRONG_SUPPLIER_DECLARATION_TYPE;
+				$this->error_description = sprintf(DESCRIPTION_WRONG_SUPPLIER_DECLARATION_TYPE, $this->declaration_type); 		
+				return false;
+			}
+			
+		//	$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;
+		}
+		//************************ true company vozvrat************************************************************
+		$data = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow(1, 5)->getValue() );		
+		$pattern = '/^.*?\s.*?\s(.*\").*?:\s(\d+),.*$/';
+		preg_match($pattern, $data, $matches);
+		//print_r($matches);exit;
+		if (isset($matches[2])&&($matches[2] == 6154127865)){ //true company vozvrat
+			//echo "jopa";exit;
+			$supplier_inn = $matches[2];
+			$supplier_kpp = '615401001'; //data not in file
+			$res = validate_company($supplier_inn, $supplier_kpp);
+			if (!$res){
+				return false;
+			}			
+			$this->supplier_inn = $supplier_inn;
+			$this->supplier_kpp = $supplier_kpp;
+			
+			$worksheet->removeColumnByIndex(6, 11);
+			$objWorksheet->insertNewColumnBeforeByIndex(6,3);
+			
+			$this->objPHPExcel->getSheet(0)->getCell('G8')->setValue(iconv("cp1251", "UTF-8",$matches[1]));
+			$this->objPHPExcel->getSheet(0)->getCell('H8')->setValue($matches[2]);
+			$this->objPHPExcel->getSheet(0)->getCell('I8')->setValue('615401001');//data not in file
+			$this->copyRange(6,8,8,2);
+			$this->repearGorizontLine(1,4);
+			
+			//$objWriter = PHPExcel_IOFactory::createWriter($this->objPHPExcel, 'Excel5');														
+			//$objWriter->save($this->path_to_file);
+			return true;
+		}
+		
+		//************************ try standart form************************************************************
+		$highestRow = $objWorksheet->getHighestRow();
+		$highestColumn = $objWorksheet->getHighestColumn(); // e.g 'F'
+		$highestColumnIndex = PHPExcel_Cell::columnIndexFromString($highestColumn); 
+		$j = 1;
+		$k = 1;
+		$m = 1;
+		$start_i = 1;
+		$flag = false;
+		$flag1 = false;
+		while ($j <= $highestRow){
+			if (!$flag){
+				for ($i=0; $i<=$highestColumnIndex; $i++){
+					if ($objWorksheet->getCellByColumnAndRow($i, $j)->getValue() == 1){											
+						$start_i = $i;
+						$res = $this->testGorizontalSequence1($j,$start_i);
+						if (!is_numeric($res )){ 							
+							$flag = true;
+							break;
+						}else{ 	
+							if ($j != $highestRow){
+								$j++;
+								$i=0;
+							}else{
+								break;
+							}
+						}						
+					}
+					
+				}
+			}
+			$j++;
+			
+			if ($flag){ // gorizont test is good				
+				while (($j <= $highestRow) && (!$flag1)){
+					if ($objWorksheet->getCellByColumnAndRow($start_i-1, $j)->getValue() != 1){
+						$j++;
+					}else{
+						$res1 = $this->testVerticalSequence($j,$start_i-1);
+						if (!is_numeric( $res1 )){ 
+							$flag1 = true;
+						}else{ 
+							$this->error = ERROR_CODE_WRONG_VERTICAL_SEQUENCE;
+							$this->error_description = sprintf(DESCRIPTION_WRONG_VERTICAL_SEQUENCE, $res1);  				
+							return false; 
+						}	
+					}
+				}
+			}
+			if ($flag && $flag1){				
+				return true;
+			}
+		}
+		return false; // поставщик не найден
+	}
+	
+	public function vozvrat_set($row_start, $column_search, $index_for_set_value){
+		$objWorksheet = $this->objPHPExcel->getActiveSheet();
+		$tmp_row = $row_start;
+		//VOZVRAT
+		$highestRow = $objWorksheet->getHighestRow();	
+		$flag = false;
+		while  ($tmp_row<=$highestRow) {			
+		
+			$main_str = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow($column_search, $tmp_row)->getValue() );
+			//$str = mb_strtolower( VOZVRAT,  'UTF-8');
+			$my_str = iconv("UTF-8", "cp1251", VOZVRAT);
+			$pos = strpos($main_str, $my_str);
+			if ($pos === false) {
+				$tmp_row++;
+				//echo 'not found'.PHP_EOL;
+			}else{
+			//	echo "jopa";exit;
+				$flag = true;
+				break;
+			}				
+		}
+		//exit;
+		if ($flag){
+			while ($tmp_row<=$highestRow){
+				if ( is_numeric($objWorksheet->getCellByColumnAndRow($index_for_set_value, $tmp_row)->getValue()) ){
+					$objWorksheet->getCellByColumnAndRow($index_for_set_value, $tmp_row)->setValue( (-1)*$objWorksheet->getCellByColumnAndRow($index_for_set_value, $tmp_row)->getValue() );
+				}
+				$tmp_row++;
+			}
+			
+		}
+	}
+	
+	public function vestaDate($colmn, $row, $compear_wiht){	
+		$objWorksheet = $this->objPHPExcel->getActiveSheet();	
+		$highestRow = $objWorksheet->getHighestRow();	
+		$tmp_row = $row;
+		while ($tmp_row <= $highestRow){
+			if ( is_numeric( $objWorksheet->getCellByColumnAndRow($compear_wiht, $tmp_row)->getValue()) ){
+				$data = $objWorksheet->getCellByColumnAndRow($colmn, $tmp_row)->getValue();
+				$pattern = '/^(.*?)\s*(.*?)$/';
+				preg_match($pattern, $data, $matches);
+				//print_r($matches);exit;
+				$objWorksheet->getCellByColumnAndRow($colmn,$tmp_row)->setValue( $matches[1] );							
+			}
+			$tmp_row++;
+		}
+	}
+	public function mixDate($colmn, $row, $compear_wiht){	
+		$objWorksheet = $this->objPHPExcel->getActiveSheet();	
+		$highestRow = $objWorksheet->getHighestRow();	
+		$tmp_row = $row;
+		while ($tmp_row <= $highestRow){
+			if ( is_numeric( $objWorksheet->getCellByColumnAndRow($compear_wiht, $tmp_row)->getValue()) ){
+				$data = $objWorksheet->getCellByColumnAndRow($colmn, $tmp_row)->getValue();
+				$pattern = '/^(\d+)\s(.*?)\s(\d+).*$/';
+				preg_match($pattern, $data, $matches);
+				switch ( $matches[1]) {
+					case 1: $matches[1] = '01';
+						break;
+					case 2: $matches[1] = '02';
+						break;
+					case 3: $matches[1] = '03';
+						break;
+					case 4: $matches[1] = '04';
+						break;
+					case 5: $matches[1] = '05';
+						break;
+					case 6: $matches[1] = '06';
+						break;
+					case 7: $matches[1] = '07';
+						break;
+					case 8: $matches[1] = '08';
+						break;
+					case 9: $matches[1] = '09';
+						break;
+				}
+				switch ( $matches[2]) {
+					case 'Января': $month = '01';
+						break;
+					case 'Февраля': $month = '02';
+						break;
+					case 'Марта': $month = '03';
+						break;
+					case 'Апреля': $month = '04';
+						break;
+					case 'Мая': $month = '05';
+						break;
+					case 'Июня': $month = '06';
+						break;
+					case 'Июля': $month = '07';
+						break;
+					case 'Августа': $month = '08';
+						break;
+					case 'Сентября': $month = '09';
+						break;
+					case 'Октября': $month = '10';
+						break;
+					case 'Ноября': $month = '11';
+						break;
+					case 'Декабря': $month = '12';
+						break;
+				}							
+				$objWorksheet->getCellByColumnAndRow($colmn,$tmp_row)->setValue( $matches[1].".".$month.".".$matches[3] );							
+			}
+			$tmp_row++;
+		}
+	}
+	public function formatDate($colmn, $row, $compear_wiht){	
+		$objWorksheet = $this->objPHPExcel->getActiveSheet();	
+		$highestRow = $objWorksheet->getHighestRow();	
+		$tmp_row = $row;
+		while ($tmp_row <= $highestRow){
+			if ( is_numeric( $objWorksheet->getCellByColumnAndRow($compear_wiht, $tmp_row)->getValue()) ){
+				$data = $objWorksheet->getCellByColumnAndRow($colmn, $tmp_row)->getValue();
+				$pattern = '/^(\d+)\.(\d+)\.(\d+)$/';
+				preg_match($pattern, $data, $matches);
+				//print_r($matches);exit;
+				$objWorksheet->getCellByColumnAndRow($colmn,$tmp_row)->setValue( $matches[1].".".$matches[2].".20".$matches[3] );							
+			}
+			$tmp_row++;
+		}
+	}
+	
+	public function findMoreKpp($start_row, $pattern, $col, $start_col_for_set_data, $col_for_campear_copy, $code_fo_set){
+		$objWorksheet = $this->objPHPExcel->getActiveSheet();
+		$tmp_row = $start_row;
+		
+		/*
+		$matches[1] => 5035042138
+		$matches[2] => 772945001				
+		*/		
+		
+		$data = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow( $col, $tmp_row)->getValue() );	
+		if ($code_fo_set == 0){
+			$str = mb_strtolower( PO_OBOSOB,  'UTF-8');
+			$my_str = iconv("UTF-8", "cp1251", $str );
+		}elseif($code_fo_set == 2){
+			$my_str = iconv("UTF-8", "cp1251", PO_OBOSOB );
+		}elseif($code_fo_set == 1){			
+			$my_str = iconv("UTF-8", "cp1251", PO_OBOSOB1 );			
+		}
+		
+		$pos = strpos($data, $my_str);		
+		$highestRow = $objWorksheet->getHighestRow();	
+		while ($tmp_row<=$highestRow){ // for many kpp			
+			if ( !($pos === false) ){	
+				preg_match($pattern, $data, $matches);
+				switch ($code_fo_set){
+					case 0:
+						$objWorksheet->getCellByColumnAndRow($start_col_for_set_data,$tmp_row+1)->setValue(iconv("cp1251", "UTF-8", $matches[1]));
+						$objWorksheet->getCellByColumnAndRow($start_col_for_set_data+1,$tmp_row+1)->setValue($matches[2]);
+						$objWorksheet->getCellByColumnAndRow($start_col_for_set_data+2,$tmp_row+1)->setValue($matches[3]);
+						
+						$this->copyRange($start_col_for_set_data,$tmp_row+1,$start_col_for_set_data+2, $col_for_campear_copy);
+						break;
+					case 1: 
+						//$data = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow( $col, $tmp_row)->getValue() );
+						
+						$objWorksheet->getCellByColumnAndRow($start_col_for_set_data,$tmp_row+1)->setValue($matches[1]);
+						
+						$this->copyRange($start_col_for_set_data,$tmp_row+1,$start_col_for_set_data, $col_for_campear_copy);
+						break;
+					case 2:
+				}				
+			}					
+			$tmp_row++;
+			$data = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow( $col, $tmp_row)->getValue() );								
+			$pos = strpos($data, $my_str);
+		}
+	}
+	
+	public function delHeader($column, $start_row, $flag){
+		$objWorksheet = $this->objPHPExcel->getActiveSheet();
+		$tmp_row = $start_row;
+		$highestRow = $objWorksheet->getHighestRow();	
+		//$flag = false;
+		while ($tmp_row<=$highestRow) {						
+			$main_str = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow($column, $tmp_row)->getValue() );
+			if ($flag) {
+				$str = mb_strtolower( PO_OBOSOB,  'UTF-8');
+				$my_str = iconv("UTF-8", "cp1251", $str );
+			}else{
+				$my_str = iconv("UTF-8", "cp1251", PO_OBOSOB );
+			}
+			
+			$pos = strpos($main_str, $my_str);
+			if ($pos === false) {
+				$tmp_row++;
+				//echo 'not found'.PHP_EOL;
+			}else{
+				//echo "jopa";exit;
+				//$data = iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow($column, $tmp_row)->getValue() );									
+				//preg_match($pattern, $data, $matches);
+				$objWorksheet->removeRow($start_row, $tmp_row-$start_row);
+				return true;
+			//	break;
+			}				
+		}
+		return false;
+	}
+	
+	public function repearVerticalLine ($row_star_with, $column, $column_for_compare, $col_kpp, $col_kpp_str, $code){ // add for many kpp!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+		$objWorksheet = $this->objPHPExcel->getActiveSheet();		
+		$highestRow = $objWorksheet->getHighestRow();										
+		$i=1;
+		$flag_first = true;
+		switch ($code) {
+			case 0:		$my_str = iconv("UTF-8", "cp1251", PO_OBOSOB );		
+						break;
+			case 1:		$my_str = PO_OBOSOB ;		
+						break;
+		}
+		
+		for ($row = $row_star_with; $row <= $highestRow; ++$row) {	
+			$pos = strpos($objWorksheet->getCellByColumnAndRow($col_kpp_str, $row)->getValue(), $my_str);
+			//print_r(iconv("UTF-8", "cp1251", $objWorksheet->getCellByColumnAndRow($col_kpp_str, $row)->getValue())."\n");			
+			//print_r($pos."\n");
+			if (!($pos === false) ){
+				$i = 1;
+			}
+			
+			if ( is_numeric($objWorksheet->getCellByColumnAndRow($column_for_compare, $row)->getValue() ) ){
+				if ($flag_first){
+					$kpp = $objWorksheet->getCellByColumnAndRow($col_kpp, $row)->getValue();					
+					$flag_first = false;					
+				}															
+				if ( $kpp != $objWorksheet->getCellByColumnAndRow($col_kpp, $row)->getValue() ){
+					$i = 1;
+					$kpp = $objWorksheet->getCellByColumnAndRow($col_kpp, $row)->getValue();
+					$this->objPHPExcel->getSheet(0)->getCellByColumnAndRow($column,$row)->setValue($i); 
+					$i++;
+					continue;
+				}
+				
+				$this->objPHPExcel->getSheet(0)->getCellByColumnAndRow($column,$row)->setValue($i); 
+				$i++;			
+			}
+		}
+	}
+	
+	
+	public function deleteLinesMore500($row_start_whith, $column){
+		if ($this->declaration_type == 11) {		
+			$objWorksheet = $this->objPHPExcel->getActiveSheet();		
+			$highestRow = $objWorksheet->getHighestRow();								
+			//echo "HighestRow - ".$objWorksheet->getHighestRow();
+			for ($row = $row_start_whith; $row <= $highestRow; ++$row) {
+				if ( is_numeric($objWorksheet->getCellByColumnAndRow($column, $row)->getValue() ) && ($objWorksheet->getCellByColumnAndRow($column, $row)->getValue() >= 500)  ) {   
+					//echo "\n\n\n".$objWorksheet->getCellByColumnAndRow($column, $row)->getValue()."\n".$row."\n";					
+					$j=1;
+					$tmp_row = $row+1;
+					while ( ($objWorksheet->getCellByColumnAndRow($column, $tmp_row)->getValue() >= '500') && ($tmp_row<=$highestRow) ){
+						$tmp_row++;
+						$j++;
+					}
+					//echo $j;					
+					$objWorksheet->removeRow($row,$j);					
+					$highestRow = $objWorksheet->getHighestRow();												
+				}else{				
+					//echo "jopa";
+				}
+					//echo "value - ".$objWorksheet->getCellByColumnAndRow($column, $row)->getValue()."; row - ".$row." HighestRow - ".$objWorksheet->getHighestRow()."\n";
+					//echo "jopa ";
+			}						
+		}else{
+			$objWorksheet = $this->objPHPExcel->getActiveSheet();		
+			$highestRow = $objWorksheet->getHighestRow();								
+			//echo "HighestRow - ".$objWorksheet->getHighestRow();
+			for ($row = $row_start_whith; $row <= $highestRow; ++$row) {
+				if ( is_numeric($objWorksheet->getCellByColumnAndRow($column, $row)->getValue() ) && ($objWorksheet->getCellByColumnAndRow($column, $row)->getValue() < 500)  ) {     
+					$j=1;
+					$tmp_row = $row+1;
+					while ( ($objWorksheet->getCellByColumnAndRow($column, $tmp_row)->getValue() < '500') && ($tmp_row<=$highestRow) ){
+						$tmp_row++;
+						$j++;
+					}
+					$objWorksheet->removeRow($row,$j);					
+					$highestRow = $objWorksheet->getHighestRow();														
+				}else{
+
+				}				
+			}
+			
+		}
+	}
+        public function delFooter (){
+            $objWorksheet = $this->objPHPExcel->getActiveSheet();
+            $highestColumn = $objWorksheet->getHighestColumn(); // e.g 'F'
+            $highestColumnIndex = PHPExcel_Cell::columnIndexFromString($highestColumn); // e.g. 5
+            $flag = false;
+            for ($row = 1; $row <= $highestColumnIndex; ++$row) {
+                $tmp = $this->objPHPExcel->getSheet(0)->getCellByColumnAndRow(0,$row)->getValue();
+                if ( (is_numeric($tmp)) && ($tmp>2) ){
+                    $flag = true;                    
+                }else{
+                    if ($flag == true){
+                        $flag = false;
+                        $star_tmp =  $row;                                          
+                    }
+                    
+                }
+            }
+            $end_tmp = $row;  
+            
+            $objWorksheet->removeRow($star_tmp,$end_tmp);
+        
+            
+        }
+	public function repearGorizontLine($colunm, $line_of_repear){
+		$objWorksheet = $this->objPHPExcel->getActiveSheet();
+		$highestColumn = $objWorksheet->getHighestColumn(); // e.g 'F'
+		$highestColumnIndex = PHPExcel_Cell::columnIndexFromString($highestColumn); // e.g. 5
+		$i=1;
+		$flag = true;
+		for ($col = $colunm; $col <= $highestColumnIndex; ++$col) {
+			if($this->declaration_type == 11){
+				if ($i<=16){
+					$this->objPHPExcel->getSheet(0)->getCellByColumnAndRow($col,$line_of_repear)->setValue($i);
+					$i++;
+				}else{
+					break;
+				}
+			}else{
+				if ($i<=12){
+					if ( (trim( $objWorksheet->getCellByColumnAndRow(8, 12)->getValue()) == '6165105655' || trim( $objWorksheet->getCellByColumnAndRow(8, 12)->getValue()) == '6168023633') && $i==2 && $flag){
+						$flag = false;
+						continue;
+					}
+					$this->objPHPExcel->getSheet(0)->getCellByColumnAndRow($col,$line_of_repear)->setValue($i);
+					$i++;
+				}else{
+					break;
+				}
+			}
+		}
+	
+		
+	}
+	public function repearGorizontLineByNumber($colunm, $line_of_repear){
+		$objWorksheet = $this->objPHPExcel->getActiveSheet();
+		$highestColumn = $objWorksheet->getHighestColumn(); // e.g 'F'
+		$highestColumnIndex = PHPExcel_Cell::columnIndexFromString($highestColumn); // e.g. 5
+		$highestColumnIndex  = 100;
+		$i=1;
+		$flag = true;
+		for ($col = $colunm; $col <= $highestColumnIndex; ++$col) {
+			if($this->declaration_type == 11){
+				if ($i<=16){
+                                        if (is_numeric( $this->objPHPExcel->getSheet(0)->getCellByColumnAndRow($col,$line_of_repear) )){
+                                            $this->objPHPExcel->getSheet(0)->getCellByColumnAndRow($col,$line_of_repear)->setValue($i);
+                                            $i++;
+                                        }
+				}else{
+					break;
+				}
+			}else{
+				if ($i<=12){
+					if ( (trim( $objWorksheet->getCellByColumnAndRow(8, 12)->getValue()) == '6165105655' || trim( $objWorksheet->getCellByColumnAndRow(8, 12)->getValue()) == '6168023633') && $i==2 && $flag){
+						$flag = false;
+						continue;
+					}					
+					
+					//print_r($col." - ".$this->objPHPExcel->getSheet(0)->getCellByColumnAndRow($col,$line_of_repear)."\n");
+					
+					if (is_numeric( trim($this->objPHPExcel->getSheet(0)->getCellByColumnAndRow($col,$line_of_repear))  )){
+						//print_r("\n".$col." - ".$this->objPHPExcel->getSheet(0)->getCellByColumnAndRow($col,$line_of_repear)."\n");
+						$this->objPHPExcel->getSheet(0)->getCellByColumnAndRow($col,$line_of_repear)->setValue($i);
+						$i++;
+					}
+				}else{
+					break;
+				}
+			}
+		}
+	
+		
+	}
+        
+        
+        
+	/*
+	copy from $col_left to $col_right down for $row_ lines and control 
+	$number_row_for_copy_data for paste data in data line
+	
+	*/
+	public function copyRange($col_left, $row_, $col_right, $number_row_for_copy_data) {		
+		$objWorksheet = $this->objPHPExcel->getActiveSheet();		
+		$highestRow = $objWorksheet->getHighestRow();		
+		for ($row = $col_left; $row <= $col_right; ++$row) {
+			for ($col = $row_; $col <= $highestRow; ++$col) {					
+				if ( is_numeric( $objWorksheet->getCellByColumnAndRow($number_row_for_copy_data, $col)->getValue() ) ) {
+					$this->objPHPExcel->getSheet(0)->getCellByColumnAndRow($row,$col)->setValue($objWorksheet->getCellByColumnAndRow($row, $row_)->getValue());									
+				}
+			}
+		}		
+	}
+	
+	public function testGorizontalSequence($row_, $col_since) {
+		return true;
+	}
+	public function testGorizontalSequence1($row_, $col_since) {
+	
+		$num_gor = 0;
+		$objWorksheet = $this->objPHPExcel->getActiveSheet();
+		$highestColumn = $objWorksheet->getHighestColumn(); // e.g 'F'
+		$highestColumnIndex = PHPExcel_Cell::columnIndexFromString($highestColumn); // e.g. 5
+		$i = 1;
+		
+		for ($col = $col_since; $col <= $highestColumnIndex; ++$col) {
+			if ($this->declaration_type == 11){
+				if ($i ==  $objWorksheet->getCellByColumnAndRow($col, $row_)->getValue() && ($i <= 16)){
+					//if ($i<>16) 
+					if (is_numeric ($objWorksheet->getCellByColumnAndRow($col, $row_)->getValue() )) {
+						$rem_col = $col;
+					}
+					$i++;						
+				}else{
+					if (!is_numeric( $objWorksheet->getCellByColumnAndRow($col, $row_)->getValue() ) ){								
+					
+					}else{						
+						$num_gor = $col;
+						return $num_gor;												
+					}
+				}				
+			}else{
+				if ($i ==  $objWorksheet->getCellByColumnAndRow($col, $row_)->getValue() && ($i <= 12)){
+					//if ($i<>12) 
+					if (is_numeric ($objWorksheet->getCellByColumnAndRow($col, $row_)->getValue() )) {
+						$rem_col = $col;
+					}					
+					$i++;
+				}else{
+					if (!is_numeric( $objWorksheet->getCellByColumnAndRow($col, $row_)->getValue() ) ){
+							//print_r("jopa");exit;
+					}else{				
+						//print_r("jopa");exit;
+						$num_gor = $col;
+						return $num_gor;												
+					}
+				}				
+			}
+			
+		}
+
+		if ( (($this->declaration_type == 11) && ( $i<16 )) || (($this->declaration_type == 11) && ( $i-1<16 )) ){
+			$num_gor = $rem_col;
+			return $num_gor;
+		}
+		
+		if ((($this->declaration_type == 12) && ( $i-1>12 )) || (($this->declaration_type == 12) && ( $i-1<12 ))){
+			$num_gor = $rem_col;
+			return $num_gor;
+		}
+		return true;
+	}
+	
+	public function testVerticalSequence($row_since, $col_) {
+		$num_ver = 0;
+		$objWorksheet = $this->objPHPExcel->getActiveSheet();
+		$highestRow = $objWorksheet->getHighestRow(); // e.g. 10			
+		$i = 1;		
+		for ($row = $row_since; $row <= $highestRow; ++$row) {
+			if ($i ==  $objWorksheet->getCellByColumnAndRow($col_, $row)->getValue() ){						
+				$i++;						
+			}else{
+				if (!is_numeric( $objWorksheet->getCellByColumnAndRow($col_, $row)->getValue() ) ){
+						
+				}else{ //test for kpp > 1
+					if ($objWorksheet->getCellByColumnAndRow($col_, $row)->getValue() == 1){
+						$i = 2;								
+					}else{		
+						$num_ver = $row;
+						return $num_ver;								
+					}
+				}
+			}
+		}
+		return true;
+	}
+}
+?>

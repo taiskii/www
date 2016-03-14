@@ -1,0 +1,320 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<xs:schema targetNamespace="http://tempuri.org/XMLSchema.xsd"
+    elementFormDefault="qualified"
+    xmlns="http://tempuri.org/XMLSchema.xsd"
+    xmlns:mstns="http://tempuri.org/XMLSchema.xsd"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+>
+
+
+  <xs:element name="Details">
+    <xs:annotation>
+      <xs:documentation>Список лицензий</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="Detail" maxOccurs="unbounded">
+          <xs:annotation>
+            <xs:documentation>Лицензия</xs:documentation>
+          </xs:annotation>
+          <xs:complexType>
+            
+            <xs:attribute name="Полное_и_сокращенное_наименование_организации_с_указанием_ее_организационно___правовой_формы" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  Полное_и_сокращенное_наименование_организации_с_указанием_ее_организационно___правовой_формы
+                </xs:documentation>              
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="4000"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+            <xs:attribute name="ИНН_организации" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  ИНН_организации
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="12"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+            <xs:attribute name="КПП_организации" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  КПП_организации
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="10"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+
+            <xs:attribute name="Адрес__место_нахождения___организации" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  Адрес__место_нахождения___организации
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="4000"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+
+
+            <xs:attribute name="Адрес_электронной_почты_организации" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  Адрес_электронной_почты_организации
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="500"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+
+            <xs:attribute name="Место_нахождения__адрес__обособленного_подразделения_организации__осуществляющего_лицензируемый_вид_деятельности" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  Место_нахождения__адрес__обособленного_подразделения_организации__осуществляющего_лицензируемый_вид_деятельности
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="4000"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+
+
+            <xs:attribute name="КПП_обособленного_подразделения_организации__осуществляющего_лицензируемый_вид_деятельности" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  КПП_обособленного_подразделения_организации__осуществляющего_лицензируемый_вид_деятельности
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="10"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+
+
+            <xs:attribute name="Код_субъекта_Российской_Федерации_по_месту_нахождения_организации" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  Код_субъекта_Российской_Федерации_по_месту_нахождения_организации
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="10"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+
+
+            <xs:attribute name="Код_субъекта_РФ_по_месту_нахождения_обособленного_подразделения_организации__осуществляющего_лицензируемый_вид_деятельности" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  Код_субъекта_РФ_по_месту_нахождения_обособленного_подразделения_организации__осуществляющего_лицензируемый_вид_деятельности
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="10"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+
+
+            <xs:attribute name="Вид_лицензируемой_деятельности_организации" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  Вид_лицензируемой_деятельности_организации
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="1000"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+
+            <xs:attribute name="Дата_выдачи_лицензии" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  Дата_выдачи_лицензии
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="50"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+            <xs:attribute name="Дата_окончания_действия_лицензии" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  Дата_выдачи_лицензии
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="50"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+            <xs:attribute name="Номер_лицензии__соответствующий_номеру_записи_в_реестре" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  Дата_выдачи_лицензии
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="100"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+            <xs:attribute name="Сведения_о_действии_лицензии" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  Дата_выдачи_лицензии
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="1000"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+
+            <xs:attribute name="Дата_изменения_сведений_о_действии_лицензии" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  Дата_выдачи_лицензии
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="50"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+            <xs:attribute name="Основание_изменения_сведений_о_действии_лицензии" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  Дата_выдачи_лицензии
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="4000"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+
+
+
+            <xs:attribute name="История_изменений_сведений_о_действии_лицензии" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  Дата_выдачи_лицензии
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="4000"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+
+            <xs:attribute name="Номер_бланка" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  Дата_выдачи_лицензии
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="500"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+
+
+
+            <xs:attribute name="Орган_выдавший_лицензию" use="required">
+              <xs:annotation>
+                <xs:documentation>
+                  Дата_выдачи_лицензии
+                </xs:documentation>
+              </xs:annotation>
+              <xs:simpleType>
+                <xs:restriction base="xs:string">
+                  <xs:maxLength value="500"/>
+                </xs:restriction>
+              </xs:simpleType>
+            </xs:attribute>
+            
+           
+            
+            
+            
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+          
+          
+          
+  
+  
+</xs:schema>
