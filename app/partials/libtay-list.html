@@ -1,0 +1,45 @@
+<div class="container-fluid">
+  <div class="row">
+    <div class="col-md-2">
+      <!--Sidebar content-->
+  <ul>
+    <li>
+      <a class="sitemapPageLink sitemapHighlight" nodeurl="Список.html">
+        <span class="sitemapPageName">Список</span></a>
+    </li>
+    <li>
+      <a class="sitemapPageLink sitemapHighlight" nodeurl="Подробности.html">
+        <span class="sitemapPageName">Подробности</span></a>
+      </li>
+    <li>
+      <a class="sitemapPageLink sitemapHighlight" nodeurl="Добавление_Редактирование.html">
+        <span class="sitemapPageName">Добавление/Редактирование</span></a>
+    </li>
+    </ul>
+    </div>
+    <div class="col-md-10">
+      <!--Body content-->
+      <h2>Каталог книг</h2> <button ng-click="addBook()">Добавить книгу</button>
+      <br><br>
+      <input type="text" ng-model="query" class="search" value="Поиск..." style="width:750px">&nbsp&nbsp&nbsp&nbsp<button ng-click="searchClick()">Поиск</button>
+      <br>
+      <div ng-model="orderProp"><span>Сортировать по:</span><span style="font-family:Arial;font-size:13px;font-weight:normal;font-style:normal;text-decoration:underline;color:#0000FF;"
+                                                      ng-click="doSort('name')">Названию</span>&nbsp&nbsp&nbsp&nbsp
+      <span style="font-family:Arial;font-size:13px;font-weight:normal;font-style:normal;text-decoration:underline;color:#0000FF;"
+            ng-click="doSort('author')">Автору</span>
+      </div>
+      <br>
+      <ul class="library">
+        <!--| filter:query-->
+        <li ng-repeat="book in library | orderBy:orderProp|filter:query"
+            class="thumbnail phone-listing">
+          <a href="#/library/{{book.id}}" class="thumb"><img ng-src="{{book.imageUrl}}" alt="{{book.name}}"></a>
+          <a href="#/library/{{book.id}}">{{book.name}}</a>
+          <p>Дата публикации: {{book.date_published|date:"MM.dd.yyyy"}}</p></br></br>
+         <p>Автор: {{book.author}}</p>
+          </br></br>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,73 @@
+<button ng-click="backHome()">Вернуться на главную</button>
+
+<br><br><br>
+
+  <div ng-app="fileUpload" ng-controller="mainController" enctype="multipart/form-data">
+    <div class="container">
+      <div class="row">
+
+        <div class="col-sm-6">
+          <!-- FORM ============ -->
+
+          <form name="AddBookForm" ng-submit="submitForm()" novalidate>
+
+            <!-- NAME -->
+            <div class="form-group" ng-class="{ 'has-error' : AddBookForm.name.$invalid && !AddBookForm.name.$pristine }">
+              <label>Название книги</label>
+              <input type="text" name="name" class="form-control" ng-model="name" ng-maxlength="150" required>
+              <p ng-show="AddBookForm.name.$invalid && !AddBookForm.name.$pristine" class="help-block">Название книги обязательно!</p>
+              <p ng-show="AddBookForm.name.$error.maxlength" class="help-block">Слишком длинное имя книги.</p>
+            </div>
+
+            <!-- USERNAME -->
+            <div class="form-group" ng-class="{ 'has-error' : AddBookForm.author.$invalid && !AddBookForm.author.$pristine }">
+              <label>Автор</label>
+              <input type="text" name="author" class="form-control" ng-model="author" ng-maxlength="100" required>
+              <p ng-show="AddBookForm.author.$invalid && !AddBookForm.author.$pristine" class="help-block">Название автора обязательно!</p>
+              <p ng-show="AddBookForm.author.$error.maxlength" class="help-block">Слишком длинное имя автора.</p>
+            </div>
+
+            <div class="form-group" ng-class="{ 'has-error' : AddBookForm.date_published.$invalid && !AddBookForm.date_published.$pristine }">
+              <label>Дата публикации</label>
+              <input type="date" name="date_published" class="form-control" ng-model="date_published" >
+              <p ng-show="AddBookForm.date_published.$invalid && !AddBookForm.date_published.$pristine" class="help-block">Введите число.</p>
+            </div>
+
+
+            <div class="form-group" ng-class="{ 'has-error' : AddBookForm.snippet.$invalid && !AddBookForm.snippet.$pristine }">
+              <label>Описание</label>
+              <input type="text" name="snippet" class="form-control" ng-model="snippet" ng-maxlength="2000" required>
+              <p ng-show="AddBookForm.snippet.$invalid && !AddBookForm.snippet.$pristine" class="help-block">Описание обязательно!</p>
+              <p ng-show="AddBookForm.snippet.$error.maxlength" class="help-block">Слишком длинное описание.</p>
+            </div>
+
+
+            <div class="form-group" ng-class="{'has-error': AddBookForm.ImageForm.$touched && AddBookForm.ImageForm.$invalid }">
+              <label>Изображение</label>
+                  <input type="file"
+                         class="filestyle form-control"
+                         data-size="lg"
+                         name="ImageForm"
+                         id="ImageForm"
+                         ng-model="ImageForm1"
+                         ngf-pattern=".jpg,.jpeg,.png,.gif"
+                         accept=".jpg,.jpeg,.png,.gif"
+                         ngf-select="uploadPic(ImageForm1)"
+                         ngf-max-size="500kB">
+                  <span class="progress" ng-show="ImageForm1.progress >= 0">
+        <div style="width:{{ImageForm1.progress}}%"
+             ng-bind="ImageForm1.progress + '%'"></div>
+      </span>
+                  <div style="clear:both;"></div>
+
+              <img ng-show="AddBookForm.ImageForm.$valid" ngf-thumbnail="ImageForm1" class="thumb"> <button ng-click="ImageForm1 = null" ng-show="ImageForm1">Удалить</button>
+              <p ng-show="AddBookForm.ImageForm.$error.pattern && AddBookForm.ImageForm.$touched" ng-message="pattern" style="color:#F00;">Тип файла должен быть одиним из следующих: jpg, jpeg, png, gif</p>
+              <p ng-show="AddBookForm.ImageForm.$error.maxSize" ng-message="maxSize" style="color:#F00;">Максимальный размер файла 500kB</p>
+            </div>
+
+            <button type="submit" ng-click="submitForm(name, author, date_published, snippet,ImageForm1)" id="SubmitButton" name="SubmitButton" class="btn btn-primary"  ng-disabled="AddBookForm.$invalid">Добавить</button>
+
+          </form>
+        </div>
+
+

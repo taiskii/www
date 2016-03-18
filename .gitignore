@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 INSTALL.txt
 LICENSE.txt
 README.txt
@@ -16,3 +17,13 @@ nbproject
 .settings
 composer.lock
 vendor/bin
+=======
+logs/*
+!.gitkeep
+node_modules/
+tmp
+.idea
+.DS_Store
+angular-phonecat-snapshots
+bower_components/
+>>>>>>> upstream/master
